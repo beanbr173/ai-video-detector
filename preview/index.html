@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Video Check — Browser Preview</title>
+  <style>
+    :root {
+      --primary: #1565c0;
+      --surface: #f5f8fc;
+      --card: #ffffff;
+      --text: #1a1a1a;
+      --muted: #5f6368;
+      --ai: #c62828;
+      --real: #2e7d32;
+      --border: #e0e4ea;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: linear-gradient(160deg, #dfe8f3 0%, var(--surface) 100%);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px 40px;
+    }
+    .header { text-align: center; max-width: 640px; margin-bottom: 24px; }
+    .header h1 { margin: 0 0 8px; color: var(--primary); font-size: 1.6rem; }
+    .header p { margin: 0; color: var(--muted); line-height: 1.5; }
+    .phone {
+      width: min(380px, 100%);
+      background: var(--card);
+      border-radius: 28px;
+      box-shadow: 0 16px 48px rgba(0,0,0,.14);
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+    .status-bar {
+      background: var(--primary);
+      color: #fff;
+      padding: 12px 20px;
+      font-weight: 600;
+    }
+    .content { padding: 20px; display: grid; gap: 16px; }
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      background: #fff;
+    }
+    .card.center { text-align: center; }
+    .icon { font-size: 2.4rem; margin-bottom: 8px; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      margin-top: 12px;
+      padding: 12px 16px;
+      border: none;
+      border-radius: 12px;
+      background: var(--primary);
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn.outline {
+      background: transparent;
+      color: var(--primary);
+      border: 1px solid var(--primary);
+    }
+    .verdict {
+      border-radius: 16px;
+      padding: 20px;
+      background: rgba(198, 40, 40, 0.08);
+      border: 1px solid rgba(198, 40, 40, 0.2);
+    }
+    .verdict h2 { margin: 0 0 4px; color: var(--ai); }
+    .metric {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .metric:last-child { border-bottom: none; }
+    .disclaimer {
+      font-size: 0.85rem;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+    .tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; justify-content: center; }
+    .tab {
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: #fff;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+    .tab.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>AI Video Check</h1>
+    <p>Static browser preview of the Android UI. The real app runs ML on-device after you sideload the APK.</p>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-screen="idle">Idle</button>
+    <button class="tab" data-screen="analyzing">Analyzing</button>
+    <button class="tab" data-screen="result">Result</button>
+  </div>
+
+  <div class="phone">
+    <div class="status-bar">AI Video Check</div>
+    <div class="content">
+      <section id="screen-idle">
+        <div class="card center">
+          <div class="icon">🎬</div>
+          <strong>No video selected</strong>
+          <p style="color: var(--muted); font-size: 0.9rem;">Supports MP4, MOV, and other formats your phone can read.</p>
+          <button class="btn">Choose video</button>
+        </div>
+      </section>
+
+      <section id="screen-analyzing" class="hidden">
+        <div class="card center">
+          <div class="icon">⏳</div>
+          <strong>Analyzing video…</strong>
+          <p>Frame 5 of 12</p>
+          <div style="height: 8px; background: #e0e4ea; border-radius: 999px; overflow: hidden; margin-top: 12px;">
+            <div style="width: 42%; height: 100%; background: var(--primary);"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="screen-result" class="hidden">
+        <div class="verdict">
+          <h2>Likely AI-generated</h2>
+          <p style="margin: 0; font-size: 1.1rem;">78% confidence</p>
+          <p style="margin: 8px 0 0; color: var(--muted); font-size: 0.85rem;">sample_clip.mp4</p>
+        </div>
+        <div class="card">
+          <div class="metric"><span>Duration</span><strong>0:42</strong></div>
+          <div class="metric"><span>Frames analyzed</span><strong>12</strong></div>
+          <div class="metric"><span>Avg. AI score</span><strong>71%</strong></div>
+          <div class="metric"><span>AI-like frames</span><strong>67%</strong></div>
+        </div>
+        <button class="btn outline">Analyze another video</button>
+      </section>
+
+      <div class="card disclaimer">
+        Results are estimates, not proof. Newer AI generators may fool the model. Do not rely on this app for legal or forensic decisions.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.querySelectorAll('.tab').forEach((tab) => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach((t) => t.classList.remove('active'));
+        tab.classList.add('active');
+        ['idle', 'analyzing', 'result'].forEach((name) => {
+          document.getElementById('screen-' + name).classList.toggle('hidden', name !== tab.dataset.screen);
+        });
+      });
+    });
+  </script>
+</body>
+</html>
