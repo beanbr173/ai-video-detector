@@ -20,7 +20,9 @@ data class VideoAnalysisResult(
     val fakeFrameRatio: Float,
     val verdict: VideoVerdict,
     val confidencePercent: Int,
-    val frameResults: List<FrameAnalysisResult>
+    val frameResults: List<FrameAnalysisResult>,
+    val sourceUrl: String? = null,
+    val analyzedOnDevice: Boolean = true
 ) {
     val verdictLabel: String
         get() = when (verdict) {

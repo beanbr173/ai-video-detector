@@ -114,6 +114,7 @@
 
   <div class="tabs">
     <button class="tab active" data-screen="idle">Idle</button>
+    <button class="tab" data-screen="link">Link</button>
     <button class="tab" data-screen="analyzing">Analyzing</button>
     <button class="tab" data-screen="result">Result</button>
   </div>
@@ -124,9 +125,18 @@
       <section id="screen-idle">
         <div class="card center">
           <div class="icon">🎬</div>
-          <strong>No video selected</strong>
-          <p style="color: var(--muted); font-size: 0.9rem;">Supports MP4, MOV, and other formats your phone can read.</p>
-          <button class="btn">Choose video</button>
+          <strong>Local video</strong>
+          <p style="color: var(--muted); font-size: 0.9rem;">On-device scan — nothing uploaded.</p>
+          <button class="btn outline">Choose video</button>
+        </div>
+      </section>
+
+      <section id="screen-link" class="hidden">
+        <div class="card">
+          <strong>YouTube / Instagram link</strong>
+          <p style="color: var(--muted); font-size: 0.9rem;">Paste a link or share from another app. Requires Link API server.</p>
+          <input type="text" readonly value="https://instagram.com/reel/..." style="width:100%;margin:12px 0;padding:10px;border:1px solid var(--border);border-radius:8px;" />
+          <button class="btn">Analyze link</button>
         </div>
       </section>
 
@@ -167,7 +177,7 @@
       tab.addEventListener('click', () => {
         document.querySelectorAll('.tab').forEach((t) => t.classList.remove('active'));
         tab.classList.add('active');
-        ['idle', 'analyzing', 'result'].forEach((name) => {
+        ['idle', 'link', 'analyzing', 'result'].forEach((name) => {
           document.getElementById('screen-' + name).classList.toggle('hidden', name !== tab.dataset.screen);
         });
       });

@@ -13,13 +13,18 @@ android {
         applicationId = "com.kreativesolutions.aivideodetector"
         minSdk = 29
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
         }
+
+        val linkApiBaseUrl = project.findProperty("linkApiBaseUrl") as String? ?: ""
+        val linkApiKey = project.findProperty("linkApiKey") as String? ?: ""
+        buildConfigField("String", "LINK_API_BASE_URL", "\"$linkApiBaseUrl\"")
+        buildConfigField("String", "LINK_API_KEY", "\"$linkApiKey\"")
     }
 
     signingConfigs {
@@ -62,6 +67,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     composeOptions {
@@ -95,6 +101,8 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     implementation("org.tensorflow:tensorflow-lite:2.14.0")
     implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
     testImplementation("junit:junit:4.13.2")
 

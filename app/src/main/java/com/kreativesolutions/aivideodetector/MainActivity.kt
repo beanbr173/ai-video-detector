@@ -1,5 +1,6 @@
 package com.kreativesolutions.aivideodetector
 
+import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -9,7 +10,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -19,22 +19,30 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Movie
 import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -42,6 +50,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.kreativesolutions.aivideodetector.analysis.VideoAnalysisResult
 import com.kreativesolutions.aivideodetector.analysis.VideoVerdict
 import com.kreativesolutions.aivideodetector.ui.theme.AiVideoDetectorTheme
 import java.util.Locale
@@ -52,18 +61,61 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             AiVideoDetectorTheme {
-                MainScreen()
+                MainScreen(initialSharedUrl = LinkUrlHandler.extractFromIntent(intent))
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        LinkUrlHandler.extractFromIntent(intent)?.let { url ->
+            sharedUrlFromIntent = url
+        }
+    }
+
+    companion object {
+        var sharedUrlFromIntent: String? = null
     }
 }
 
 @Composable
-private fun MainScreen(viewModel: MainViewModel = viewModel()) {
+private fun MainScreen(
+    viewModel: MainViewModel = viewModel(),
+    initialSharedUrl: String? = null
+) {
     val uiState by viewModel.uiState.collectAsState()
+    val pendingSharedUrl by viewModel.pendingSharedUrl.collectAsState()
+    val linkApiBaseUrl by viewModel.linkApiBaseUrl.collectAsState(initial = "")
+    val linkApiKey by viewModel.linkApiKey.collectAsState(initial = "")
     val context = LocalContext.current
     val appVersion = remember {
         context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?"
+    }
+
+    var linkInput by remember { mutableStateOf("") }
+    var showApiSettings by remember { mutableStateOf(false) }
+    var apiBaseUrlInput by remember { mutableStateOf(linkApiBaseUrl) }
+    var apiKeyInput by remember { mutableStateOf(linkApiKey) }
+
+    LaunchedEffect(initialSharedUrl) {
+        if (!initialSharedUrl.isNullOrBlank()) {
+            linkInput = initialSharedUrl
+            viewModel.setPendingSharedUrl(initialSharedUrl)
+        }
+    }
+
+    LaunchedEffect(MainActivity.sharedUrlFromIntent) {
+        MainActivity.sharedUrlFromIntent?.let { url ->
+            linkInput = url
+            viewModel.setPendingSharedUrl(url)
+            MainActivity.sharedUrlFromIntent = null
+        }
+    }
+
+    LaunchedEffect(linkApiBaseUrl, linkApiKey) {
+        apiBaseUrlInput = linkApiBaseUrl
+        apiKeyInput = linkApiKey
     }
 
     val picker = rememberLauncherForActivityResult(
@@ -73,10 +125,9 @@ private fun MainScreen(viewModel: MainViewModel = viewModel()) {
         try {
             context.contentResolver.takePersistableUriPermission(
                 uri,
-                android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
             )
         } catch (_: SecurityException) {
-            // Some providers do not allow persistable permissions.
         }
         val name = context.contentResolver.query(
             uri,
@@ -105,13 +156,30 @@ private fun MainScreen(viewModel: MainViewModel = viewModel()) {
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "Pick a video to scan on your phone. The app extracts frames and runs an on-device model — nothing is uploaded.",
+                text = "Scan a local video on-device, or paste a YouTube / Instagram link (fetched and analyzed on your Link API server).",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f)
             )
 
             when (val state = uiState) {
-                MainViewModel.UiState.Idle -> IdleContent(onPickVideo = { picker.launch(arrayOf("video/*")) })
+                MainViewModel.UiState.Idle -> IdleContent(
+                    linkInput = linkInput,
+                    onLinkInputChange = { linkInput = it },
+                    onAnalyzeLink = { viewModel.analyzeUrl(linkInput) },
+                    onPickVideo = { picker.launch(arrayOf("video/*")) },
+                    showApiSettings = showApiSettings,
+                    onToggleApiSettings = { showApiSettings = !showApiSettings },
+                    apiBaseUrlInput = apiBaseUrlInput,
+                    onApiBaseUrlChange = { apiBaseUrlInput = it },
+                    apiKeyInput = apiKeyInput,
+                    onApiKeyChange = { apiKeyInput = it },
+                    onSaveApiSettings = {
+                        viewModel.saveApiSettings(apiBaseUrlInput, apiKeyInput)
+                        showApiSettings = false
+                    },
+                    linkApiConfigured = linkApiBaseUrl.isNotBlank(),
+                    pendingSharedUrl = pendingSharedUrl
+                )
 
                 is MainViewModel.UiState.Analyzing -> AnalyzingContent(state)
 
@@ -128,7 +196,7 @@ private fun MainScreen(viewModel: MainViewModel = viewModel()) {
 
             DisclaimerCard()
             Text(
-                text = "Version $appVersion · 100% on-device",
+                text = "Version $appVersion",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
             )
@@ -137,11 +205,74 @@ private fun MainScreen(viewModel: MainViewModel = viewModel()) {
 }
 
 @Composable
-private fun IdleContent(onPickVideo: () -> Unit) {
+private fun IdleContent(
+    linkInput: String,
+    onLinkInputChange: (String) -> Unit,
+    onAnalyzeLink: () -> Unit,
+    onPickVideo: () -> Unit,
+    showApiSettings: Boolean,
+    onToggleApiSettings: () -> Unit,
+    apiBaseUrlInput: String,
+    onApiBaseUrlChange: (String) -> Unit,
+    apiKeyInput: String,
+    onApiKeyChange: (String) -> Unit,
+    onSaveApiSettings: () -> Unit,
+    linkApiConfigured: Boolean,
+    pendingSharedUrl: String?
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Link,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.height(40.dp)
+            )
+            Text(
+                text = "YouTube or Instagram link",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            if (!pendingSharedUrl.isNullOrBlank() && linkInput.isBlank()) {
+                Text(
+                    text = "Shared link ready — tap Analyze link.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            OutlinedTextField(
+                value = linkInput,
+                onValueChange = onLinkInputChange,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Paste link") },
+                placeholder = { Text("https://youtube.com/... or instagram.com/reel/...") },
+                singleLine = true
+            )
+            Button(
+                onClick = onAnalyzeLink,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = linkInput.isNotBlank()
+            ) {
+                Icon(Icons.Outlined.Link, contentDescription = null)
+                Text("Analyze link", modifier = Modifier.padding(start = 8.dp))
+            }
+            if (!linkApiConfigured) {
+                Text(
+                    text = "Configure your Link API URL below before analyzing links.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFFEF6C00)
+                )
+            }
+        }
+    }
+
+    Card(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -151,20 +282,53 @@ private fun IdleContent(onPickVideo: () -> Unit) {
                 imageVector = Icons.Outlined.Movie,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.height(48.dp)
+                modifier = Modifier.height(40.dp)
             )
             Text(
-                text = "No video selected",
+                text = "Local video (on-device)",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold
             )
             Text(
-                text = "Supports MP4, MOV, and other formats your phone can read.",
+                text = "Nothing is uploaded — analysis runs entirely on your phone.",
                 style = MaterialTheme.typography.bodySmall
             )
-            Button(onClick = onPickVideo, modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(onClick = onPickVideo, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Outlined.CloudUpload, contentDescription = null)
                 Text("Choose video", modifier = Modifier.padding(start = 8.dp))
+            }
+        }
+    }
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            TextButton(onClick = onToggleApiSettings) {
+                Icon(Icons.Outlined.Settings, contentDescription = null)
+                Text("Link API settings", modifier = Modifier.padding(start = 8.dp))
+            }
+            if (showApiSettings) {
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                OutlinedTextField(
+                    value = apiBaseUrlInput,
+                    onValueChange = onApiBaseUrlChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("API base URL") },
+                    placeholder = { Text("https://your-api.example.com") },
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = apiKeyInput,
+                    onValueChange = onApiKeyChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("API key (optional)") },
+                    singleLine = true
+                )
+                Button(
+                    onClick = onSaveApiSettings,
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                ) {
+                    Text("Save settings")
+                }
             }
         }
     }
@@ -180,18 +344,15 @@ private fun AnalyzingContent(state: MainViewModel.UiState.Analyzing) {
         ) {
             CircularProgressIndicator()
             Text(
-                text = "Analyzing video…",
+                text = state.statusMessage,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold
             )
             if (state.totalFrames > 0) {
-                Text("Frame ${state.currentFrame} of ${state.totalFrames}")
                 LinearProgressIndicator(
                     progress = { state.currentFrame.toFloat() / state.totalFrames },
                     modifier = Modifier.fillMaxWidth()
                 )
-            } else {
-                Text("Extracting frames…")
             }
         }
     }
@@ -199,7 +360,7 @@ private fun AnalyzingContent(state: MainViewModel.UiState.Analyzing) {
 
 @Composable
 private fun ResultContent(
-    result: com.kreativesolutions.aivideodetector.analysis.VideoAnalysisResult,
+    result: VideoAnalysisResult,
     onAnalyzeAnother: () -> Unit
 ) {
     val verdictColor = when (result.verdict) {
@@ -231,6 +392,22 @@ private fun ResultContent(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
             )
+            if (!result.sourceUrl.isNullOrBlank()) {
+                Text(
+                    text = result.sourceUrl,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+            Text(
+                text = if (result.analyzedOnDevice) {
+                    "Analyzed on device"
+                } else {
+                    "Analyzed via Link API (video deleted on server after scan)"
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+            )
         }
     }
 
@@ -254,7 +431,7 @@ private fun ResultContent(
 
     OutlinedButton(onClick = onAnalyzeAnother, modifier = Modifier.fillMaxWidth()) {
         Icon(Icons.Outlined.Refresh, contentDescription = null)
-        Text("Analyze another video", modifier = Modifier.padding(start = 8.dp))
+        Text("Analyze another", modifier = Modifier.padding(start = 8.dp))
     }
 }
 
@@ -305,7 +482,7 @@ private fun DisclaimerCard() {
         ) {
             Icon(Icons.Outlined.Info, contentDescription = null)
             Text(
-                text = "Results are estimates, not proof. Newer AI generators may fool the model. Do not rely on this app for legal or forensic decisions.",
+                text = "Results are estimates, not proof. Link analysis downloads video via third-party extractors; videos are deleted after scanning but transit your server. Do not use for legal or forensic decisions.",
                 style = MaterialTheme.typography.bodySmall
             )
         }
