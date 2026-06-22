@@ -111,16 +111,16 @@ private fun MainScreen(viewModel: MainViewModel = viewModel()) {
             )
 
             when (val state = uiState) {
-                UiState.Idle -> IdleContent(onPickVideo = { picker.launch(arrayOf("video/*")) })
+                MainViewModel.UiState.Idle -> IdleContent(onPickVideo = { picker.launch(arrayOf("video/*")) })
 
-                is UiState.Analyzing -> AnalyzingContent(state)
+                is MainViewModel.UiState.Analyzing -> AnalyzingContent(state)
 
-                is UiState.Result -> ResultContent(
+                is MainViewModel.UiState.Result -> ResultContent(
                     result = state.analysis,
                     onAnalyzeAnother = { viewModel.reset() }
                 )
 
-                is UiState.Error -> ErrorContent(
+                is MainViewModel.UiState.Error -> ErrorContent(
                     message = state.message,
                     onRetry = { viewModel.reset() }
                 )
@@ -171,7 +171,7 @@ private fun IdleContent(onPickVideo: () -> Unit) {
 }
 
 @Composable
-private fun AnalyzingContent(state: UiState.Analyzing) {
+private fun AnalyzingContent(state: MainViewModel.UiState.Analyzing) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(20.dp),
